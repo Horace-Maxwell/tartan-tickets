@@ -67,6 +67,8 @@ Limits of the workaround:
 
 A real database fixes all of this.
 
+Deploys: the repository is connected to Vercel, so every push to `main` redeploys https://tartan-tickets.vercel.app.
+
 ## Security spec audit
 Audit of [`docs/SECURITY_SPEC.md`](docs/SECURITY_SPEC.md) against today's build. No code was changed for this audit.
 
