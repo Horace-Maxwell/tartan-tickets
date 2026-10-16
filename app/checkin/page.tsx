@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { SignInForm } from "@/app/components";
 import { ScanForm } from "./ScanForm";
 import { getCurrentBuyer } from "@/lib/currentBuyer";
@@ -35,6 +36,7 @@ export default async function CheckIn({ searchParams }: { searchParams: Promise<
   }
   const events = svc.eventsForOrganizer(user.email);
   const list = eventId ? svc.attendeeList(user.email, eventId) : null;
+  if (list && !list.ok) notFound(); // S1: another club's event returns a real 404
 
   return (
     <>
@@ -55,7 +57,6 @@ export default async function CheckIn({ searchParams }: { searchParams: Promise<
           </li>
         ))}
       </ul>
-      {list && !list.ok && <p className="alert">{list.error}</p>}
       {list && list.ok && (
         <>
           <ScanForm eventId={list.event.id} />

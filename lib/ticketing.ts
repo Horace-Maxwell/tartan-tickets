@@ -105,6 +105,14 @@ export type ScanResult =
   | { ok: true; verdict: "admit"; buyerName: string }
   | { ok: true; verdict: "reject"; reason: string }
   | Failure;
+/** S1: one record per denied attempt to reach another tenant's data. */
+export type SecurityLogEntry = {
+  at: string;
+  kind: "cross_tenant_denied";
+  actor: string;
+  action: "attendee_list" | "scan_ticket" | "cancel_ticket";
+  resource: string;
+};
 export type Attendee = { name: string; email: string; status: Ticket["status"] };
 
 /** Stops a name like "=HYPERLINK(...)" from running as a formula when the CSV is opened in a spreadsheet. */
@@ -147,6 +155,7 @@ export class TicketingService {
   private processedWebhookIds = new Set<string>();
   private refunds = new Map<string, Refund>(); // keyed by idempotency key
   private organizers = new Map<string, Organizer>(); // keyed by email; stands in for admin approval
+  private securityEntries: SecurityLogEntry[] = [];
   private readonly webhookSecret: string;
   private readonly now: () => Date;
 
@@ -176,16 +185,35 @@ export class TicketingService {
     return org ? this.listEvents().filter((e) => e.clubId === org.clubId) : [];
   }
 
-  /** S1: an event outside the organizer's club looks exactly like a missing one. */
-  private ownEvent(email: string, eventId: string): TicketEvent | undefined {
+  /** S1: record a denied cross-tenant attempt, in memory and in the server log (Vercel keeps the latter). */
+  private logDenied(actor: string, action: SecurityLogEntry["action"], resource: string) {
+    const entry: SecurityLogEntry = {
+      at: this.now().toISOString(),
+      kind: "cross_tenant_denied",
+      actor: actor.trim().toLowerCase(),
+      action,
+      resource,
+    };
+    this.securityEntries.push(entry);
+    console.warn(JSON.stringify({ security: entry }));
+  }
+
+  securityLog(): SecurityLogEntry[] {
+    return [...this.securityEntries];
+  }
+
+  /** S1: an event outside the organizer's club looks exactly like a missing one, and the attempt is logged. */
+  private ownEvent(email: string, eventId: string, action: SecurityLogEntry["action"]): TicketEvent | undefined {
     const org = this.organizerFor(email);
     const ev = this.events.get(eventId);
-    return org && ev && ev.clubId === org.clubId ? ev : undefined;
+    if (org && ev && ev.clubId === org.clubId) return ev;
+    if (ev) this.logDenied(email, action, `event:${ev.id}`);
+    return undefined;
   }
 
   /** R3.1, R3.2, S3: admit a valid, unused ticket for this event once; reject everything else with a reason. */
   scanTicket(organizerEmail: string, eventId: string, token: unknown): ScanResult {
-    const ev = this.ownEvent(organizerEmail, eventId);
+    const ev = this.ownEvent(organizerEmail, eventId, "scan_ticket");
     if (!ev) return fail("eventNotFound");
     const code = typeof token === "string" ? token.trim().toLowerCase() : "";
     // Look up by exact token only; a ticket code is 32 hex characters, so anything else cannot match.
@@ -201,7 +229,7 @@ export class TicketingService {
 
   /** R3.3: attendee list for the organizer's own club's event only. */
   attendeeList(organizerEmail: string, eventId: string): { ok: true; event: EventView; attendees: Attendee[] } | Failure {
-    const ev = this.ownEvent(organizerEmail, eventId);
+    const ev = this.ownEvent(organizerEmail, eventId, "attendee_list");
     if (!ev) return fail("eventNotFound");
     const attendees = [...this.tickets.values()]
       .filter((t) => t.eventId === ev.id)
@@ -388,7 +416,11 @@ export class TicketingService {
   cancelTicket(email: string, ticketId: string): { ok: true; refund: Refund } | Failure {
     const t = this.tickets.get(ticketId);
     // Someone else's ticket looks exactly like a missing one (S1: do not reveal it exists).
-    if (!t || t.buyerEmail !== email.trim().toLowerCase()) return fail("ticketNotFound");
+    if (!t) return fail("ticketNotFound");
+    if (t.buyerEmail !== email.trim().toLowerCase()) {
+      this.logDenied(email, "cancel_ticket", `ticket:${t.id}`);
+      return fail("ticketNotFound");
+    }
     if (t.status === "void") return fail("alreadyCancelled");
     if (t.status === "used") return fail("ticketUsed");
     if (!this.canCancel(ticketId)) return fail("tooLateToCancel");
