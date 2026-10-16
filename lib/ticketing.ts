@@ -463,6 +463,21 @@ export class TicketingService {
     };
   }
 
+  /** Just one ticket with its order and checkout session, for the signed ticket pass (lib/ticketPass.ts). */
+  ticketSnapshot(ticketId: string): BuyerSnapshot | undefined {
+    const t = this.tickets.get(ticketId);
+    const order = t && this.orders.get(t.orderId);
+    if (!t || !order) return undefined;
+    const json = <T extends object>(x: T) => JSON.parse(JSON.stringify(x));
+    return {
+      email: t.buyerEmail,
+      orders: [json(order)],
+      sessions: [json(this.sessions.get(order.sessionId)!)],
+      tickets: [json(t)],
+      refunds: this.refundsFor(order.id).map(json),
+    };
+  }
+
   /** Merge a buyer's signed snapshot into this server copy. Never moves a status backwards (e.g. never un-voids a ticket). */
   restore(snap: BuyerSnapshot) {
     const date = (s: string) => new Date(s);

@@ -12,7 +12,7 @@ export function ScanForm({ eventId }: { eventId: string }) {
       <input type="hidden" name="eventId" value={eventId} />
       <label>
         Ticket code
-        <input name="token" required maxLength={64} autoComplete="off" spellCheck={false} placeholder="32-character code under the QR" />
+        <input name="token" required maxLength={8000} autoComplete="off" spellCheck={false} placeholder="Paste the ticket code from under the QR" />
       </label>
       <button type="submit" className="button" disabled={pending}>
         {pending ? "Checking…" : "Check in"}

@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { clearBuyerCookies, getCurrentBuyer, saveBuyerState, setBuyerCookie } from "@/lib/currentBuyer";
+import { clearBuyerCookies, getCurrentBuyer, saveBuyerState, setBuyerCookie, stateKey } from "@/lib/currentBuyer";
+import { decodeTicketPass } from "@/lib/ticketPass";
 import { getService } from "@/lib/store";
 import { type MessageKey, type ScanResult, validateBuyer } from "@/lib/ticketing";
 
@@ -69,5 +70,10 @@ export async function scanTicketAction(_prev: ScanResult | null, formData: FormD
   const eventId = String(formData.get("eventId") ?? "");
   const buyer = await getCurrentBuyer();
   if (!buyer) return { ok: false, code: "signInFirst", error: "Please sign in with your name and CMU email first." };
-  return getService().scanTicket(buyer.email, eventId, formData.get("token"));
+  const svc = getService();
+  const raw = String(formData.get("token") ?? "").slice(0, 8000);
+  // A signed pass lets this server copy learn about a ticket that was bought on another copy.
+  const pass = decodeTicketPass(raw, stateKey());
+  if (pass && svc.organizerFor(buyer.email)) svc.restore(pass.snapshot);
+  return svc.scanTicket(buyer.email, eventId, pass ? pass.token : raw);
 }

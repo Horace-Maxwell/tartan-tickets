@@ -40,7 +40,7 @@ Other commands:
 2. Buy a *Jazz Brunch* ticket. It starts in under 24 hours, so there is no Cancel button. The page says "Cancellation closed".
 
 ## What to click to see story 3 (check in attendees)
-1. Buy a *Fall Musical* ticket (story 1) and copy the **Ticket code** under the QR.
+1. Buy a *Fall Musical* ticket (story 1) and copy the **Ticket code** under the QR. It is a signed pass (`lib/ticketPass.ts`), so the check-in page can verify it even when Vercel runs it on a server copy that never saw the purchase.
 2. Click **Sign out**, open **Check-in**, and sign in as `organizer.theatre@andrew.cmu.edu` (any name). Other demo organizers: `organizer.comedy@andrew.cmu.edu`, `organizer.jazz@andrew.cmu.edu`.
 3. Click **Check in** next to *Fall Musical*, paste the code, and click **Check in**: it shows **Admit: <buyer name>**.
 4. Paste the same code again: **Reject: Ticket already used**. A cancelled ticket shows **Reject: Ticket voided**, and a code from another event shows **Reject: Ticket is for a different event**.
@@ -74,7 +74,7 @@ Audit of [`docs/SECURITY_SPEC.md`](docs/SECURITY_SPEC.md) against today's build.
 |---|---|---|
 | **S1** Tenant isolation (other clubs' data returns 404 and is logged) | Partly (404 + logging now done) | **Now satisfied:** an organizer asking for another club's attendee list, CSV export or check-in, or a buyer cancelling someone else's ticket, gets a real 404 and a `cross_tenant_denied` entry (actor, action, resource, time) is written to the server log (tests: `tests/s1_cross_club_logging.test.ts`). **Still missing:** identity is a typed email anyone can fake (needs Andrew SSO), organizer approval is a hard-coded roster (needs admin approval), and the log lives in memory plus Vercel's short-lived runtime logs (needs durable, tamper-evident log storage and someone who reviews it). |
 | **S2** Payment truth from Stripe only (verified signature, matching amount and currency, no replays) | Partly | Signature, amount, currency and replay checks are built and tested, but against our own simulated Stripe, and the "already processed" list is in memory so a replay after a restart would not be caught. |
-| **S3** Unforgeable, single-use tickets (random 128-bit token, used-marking in one transaction) | Partly | Tickets get a random 128-bit token and door check-in (US-3) admits a ticket once and rejects the second scan, but there is no database transaction, and two Vercel server copies keep separate memory, so a ticket could in theory be admitted once on each copy. |
+| **S3** Unforgeable, single-use tickets (random 128-bit token, used-marking in one transaction) | Partly | Tickets get a random 128-bit token and door check-in (US-3) admits a ticket once and rejects the second scan, but there is no database transaction, and two Vercel server copies keep separate memory, so a ticket could in theory be admitted once on each copy, and a saved copy of a pass from before a cancellation could be admitted by a copy that never saw the cancellation. |
 | **S4** Controlled organizer powers (admin approval plus audit log) | Not at all | There are no organizer or admin features, approval steps, or audit log in this build. |
 | Never store card numbers | Fully | The app never asks for or receives card data; payment is simulated, and a real build would use Stripe Checkout. |
 | Deny everything except public listings unless signed in via Andrew SSO | Not at all | There is no Andrew SSO; a typed name and email in a cookie stands in, and anyone can claim any CMU email. |

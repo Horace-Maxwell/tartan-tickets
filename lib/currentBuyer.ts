@@ -21,7 +21,7 @@ const COOKIE_OPTIONS = {
 
 // Must be the same on every server copy, so set APP_SECRET in production. Without it, each copy makes its own.
 const globalForSecret = globalThis as unknown as { tartanAppSecret?: string };
-function stateKey() {
+export function stateKey() {
   if (process.env.APP_SECRET) return process.env.APP_SECRET;
   if (process.env.NODE_ENV !== "production") return "dev-only-app-secret";
   return (globalForSecret.tartanAppSecret ??= randomBytes(32).toString("hex"));

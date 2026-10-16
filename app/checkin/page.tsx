@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { SignInForm } from "@/app/components";
+import { ErrorBanner, SignInForm } from "@/app/components";
 import { ScanForm } from "./ScanForm";
 import { getCurrentBuyer } from "@/lib/currentBuyer";
 import { formatWhen } from "@/lib/format";
@@ -9,13 +9,14 @@ import { MESSAGES } from "@/lib/ticketing";
 
 export const dynamic = "force-dynamic";
 
-export default async function CheckIn({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
-  const { event: eventId } = await searchParams;
+export default async function CheckIn({ searchParams }: { searchParams: Promise<{ event?: string; error?: string }> }) {
+  const { event: eventId, error } = await searchParams;
   const user = await getCurrentBuyer();
   if (!user) {
     return (
       <>
         <h1>Check in attendees</h1>
+        <ErrorBanner error={error} />
         <SignInForm next="/checkin" />
       </>
     );
