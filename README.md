@@ -1,11 +1,17 @@
 # Tartan Tickets (class prototype)
 
-CMU student clubs sell event tickets. This prototype builds **US-1 Buy a ticket** and **US-2 Refund my ticket** (buyer self-cancel) from [`docs/requirements.md`](docs/requirements.md).
+CMU student clubs sell event tickets. This prototype builds **US-1 Buy a ticket**, **US-2 Refund my ticket** (buyer self-cancel) and **US-3 Check in attendees** (HW3) from [`docs/requirements.md`](docs/requirements.md).
 
 Today's limits, chosen on purpose:
 - **Payments are simulated.** A fake Stripe Checkout page and a signed fake Stripe webhook stand in for the real thing.
 - **No sign-in provider.** You type your name and a CMU email.
 - **No database.** All data lives in the server's memory and resets on every restart or redeploy.
+
+## Non-goals for HW3
+- **Real payments** (Stripe). The "Pay (simulated)" button stands in.
+- **Real authentication** (Andrew SSO). A typed name and email stand in, and anyone can type any email. Organizer "approval" is a fixed demo roster in `lib/store.ts`.
+- **A database.** Data is in memory and **resets on every deploy**.
+- **A camera QR scanner.** Organizers paste or type the ticket code printed under the QR.
 
 The questions the spec left open, and the answers we chose, are in [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md).
 
@@ -19,7 +25,7 @@ npm run dev
 Open http://localhost:3000. If port 3000 is busy, Next.js prints the address it used instead.
 
 Other commands:
-- `npm test` runs the automated tests (28 tests).
+- `npm test` runs the automated tests.
 - `npm run build` runs the production build.
 
 ## What to click to see story 1 (buy a ticket)
@@ -32,6 +38,13 @@ Other commands:
 ## What to click to see story 2 (cancel my ticket)
 1. On **My tickets**, click **Cancel ticket** under the Fall Musical ticket, then **Yes, cancel and refund**. The QR code is voided and a simulated full refund is recorded.
 2. Buy a *Jazz Brunch* ticket. It starts in under 24 hours, so there is no Cancel button. The page says "Cancellation closed".
+
+## What to click to see story 3 (check in attendees)
+1. Buy a *Fall Musical* ticket (story 1) and copy the **Ticket code** under the QR.
+2. Click **Sign out**, open **Check-in**, and sign in as `organizer.theatre@andrew.cmu.edu` (any name). Other demo organizers: `organizer.comedy@andrew.cmu.edu`, `organizer.jazz@andrew.cmu.edu`.
+3. Click **Check in** next to *Fall Musical*, paste the code, and click **Check in**: it shows **Admit: <buyer name>**.
+4. Paste the same code again: **Reject: Ticket already used**. A cancelled ticket shows **Reject: Ticket voided**, and a code from another event shows **Reject: Ticket is for a different event**.
+5. The attendee list below shows each ticket's status; **Export attendee list (CSV)** downloads it. Another club's event (for example `/checkin?event=comedy-night`) shows "Event not found".
 
 ## Where things live
 | Path | What it is |

@@ -36,6 +36,7 @@ export const MESSAGES = {
   tooLateToCancel: `Tickets can only be cancelled more than ${CANCEL_CUTOFF_HOURS} hours before the event.`,
   alreadyCancelled: "This ticket was already cancelled.",
   ticketUsed: "This ticket has already been used.",
+  notOrganizer: "Only approved organizers can check in attendees.",
 } as const;
 export type MessageKey = keyof typeof MESSAGES;
 type Failure = { ok: false; code: MessageKey; error: string };
@@ -99,6 +100,24 @@ const ORDER_RANK: Record<OrderStatus, number> = { pending: 0, paid: 1, needs_ref
 const TICKET_RANK: Record<Ticket["status"], number> = { valid: 0, used: 1, void: 2 };
 const MAX_SNAPSHOT_ORDERS = 8;
 
+export type Organizer = { email: string; clubId: string };
+export type ScanResult =
+  | { ok: true; verdict: "admit"; buyerName: string }
+  | { ok: true; verdict: "reject"; reason: string }
+  | Failure;
+export type Attendee = { name: string; email: string; status: Ticket["status"] };
+
+/** Stops a name like "=HYPERLINK(...)" from running as a formula when the CSV is opened in a spreadsheet. */
+function csvCell(value: string): string {
+  let v = value;
+  let quote = /[",\r\n]/.test(v);
+  if (/^[=+\-@\t\r]/.test(v)) {
+    v = `'${v}`;
+    quote = true;
+  }
+  return quote ? `"${v.replace(/"/g, '""')}"` : v;
+}
+
 export type EventView = TicketEvent & { clubName: string; seatsLeft: number; soldOut: boolean; salesClosed: boolean };
 
 export type CheckoutResult =
@@ -127,6 +146,7 @@ export class TicketingService {
   private sessions = new Map<string, CheckoutSession>();
   private processedWebhookIds = new Set<string>();
   private refunds = new Map<string, Refund>(); // keyed by idempotency key
+  private organizers = new Map<string, Organizer>(); // keyed by email; stands in for admin approval
   private readonly webhookSecret: string;
   private readonly now: () => Date;
 
@@ -137,6 +157,65 @@ export class TicketingService {
 
   addClub(club: Club) {
     this.clubs.set(club.id, club);
+  }
+
+  /** Today's stand-in for "an admin approved this CMU user for one club". */
+  addOrganizer(org: Organizer) {
+    if (!this.clubs.has(org.clubId)) throw new Error(`Unknown club ${org.clubId}`);
+    const email = org.email.trim().toLowerCase();
+    this.organizers.set(email, { email, clubId: org.clubId });
+  }
+
+  organizerFor(email: string): Organizer | undefined {
+    return this.organizers.get(email.trim().toLowerCase());
+  }
+
+  /** Events of the organizer's own club only. */
+  eventsForOrganizer(email: string): EventView[] {
+    const org = this.organizerFor(email);
+    return org ? this.listEvents().filter((e) => e.clubId === org.clubId) : [];
+  }
+
+  /** S1: an event outside the organizer's club looks exactly like a missing one. */
+  private ownEvent(email: string, eventId: string): TicketEvent | undefined {
+    const org = this.organizerFor(email);
+    const ev = this.events.get(eventId);
+    return org && ev && ev.clubId === org.clubId ? ev : undefined;
+  }
+
+  /** R3.1, R3.2, S3: admit a valid, unused ticket for this event once; reject everything else with a reason. */
+  scanTicket(organizerEmail: string, eventId: string, token: unknown): ScanResult {
+    const ev = this.ownEvent(organizerEmail, eventId);
+    if (!ev) return fail("eventNotFound");
+    const code = typeof token === "string" ? token.trim().toLowerCase() : "";
+    // Look up by exact token only; a ticket code is 32 hex characters, so anything else cannot match.
+    const t = /^[0-9a-f]{32}$/.test(code) ? [...this.tickets.values()].find((x) => x.token === code) : undefined;
+    if (!t) return { ok: true, verdict: "reject", reason: "Unknown ticket" };
+    if (t.eventId !== ev.id) return { ok: true, verdict: "reject", reason: "Ticket is for a different event" };
+    if (t.status === "void") return { ok: true, verdict: "reject", reason: "Ticket voided" };
+    if (t.status === "used") return { ok: true, verdict: "reject", reason: "Ticket already used" };
+    // Check and mark in one synchronous step, so two scans cannot both see "valid" (single-use, S3).
+    t.status = "used";
+    return { ok: true, verdict: "admit", buyerName: t.buyerName };
+  }
+
+  /** R3.3: attendee list for the organizer's own club's event only. */
+  attendeeList(organizerEmail: string, eventId: string): { ok: true; event: EventView; attendees: Attendee[] } | Failure {
+    const ev = this.ownEvent(organizerEmail, eventId);
+    if (!ev) return fail("eventNotFound");
+    const attendees = [...this.tickets.values()]
+      .filter((t) => t.eventId === ev.id)
+      .sort((a, b) => a.buyerName.localeCompare(b.buyerName))
+      .map((t) => ({ name: t.buyerName, email: t.buyerEmail, status: t.status }));
+    return { ok: true, event: this.view(ev), attendees };
+  }
+
+  /** R3.3 export. Returns null (shown as 404) for anyone who is not this club's organizer. */
+  attendeeCsv(organizerEmail: string, eventId: string): string | null {
+    const r = this.attendeeList(organizerEmail, eventId);
+    if (!r.ok) return null;
+    const rows = [["name", "email", "status"], ...r.attendees.map((a) => [a.name, a.email, a.status])];
+    return rows.map((row) => row.map(csvCell).join(",") + "\r\n").join("");
   }
 
   addEvent(event: TicketEvent) {

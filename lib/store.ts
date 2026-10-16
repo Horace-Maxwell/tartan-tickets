@@ -20,6 +20,11 @@ function seed(svc: TicketingService) {
   svc.addClub({ id: "club_comedy", name: "Carnegie Comedy Collective", stripeAccountId: "acct_1ComedyDemo" });
   svc.addClub({ id: "club_jazz", name: "Mellon Jazz Ensemble", stripeAccountId: "acct_1JazzDemo" });
 
+  // US-3 demo roster: stands in for "an admin approved this CMU user as organizer for one club".
+  svc.addOrganizer({ email: "organizer.theatre@andrew.cmu.edu", clubId: "club_theatre" });
+  svc.addOrganizer({ email: "organizer.comedy@andrew.cmu.edu", clubId: "club_comedy" });
+  svc.addOrganizer({ email: "organizer.jazz@andrew.cmu.edu", clubId: "club_jazz" });
+
   svc.addEvent({
     id: "fall-musical",
     clubId: "club_theatre",

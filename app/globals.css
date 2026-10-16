@@ -128,3 +128,8 @@ code { font-size: 0.85em; }
 .confirm { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 6px; }
 .voided { background: #eee; color: #555; border-radius: 8px; padding: 24px 12px; text-align: center; font-weight: 600; }
 .sign-in input::placeholder { color: #a8adb3; }
+
+.attendees { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.attendees th, .attendees td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.status.used { color: var(--muted); }
+.verdict { font-size: 1.15rem; margin-top: 12px; overflow-wrap: anywhere; }

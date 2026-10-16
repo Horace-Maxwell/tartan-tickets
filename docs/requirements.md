@@ -51,3 +51,19 @@ As a club organizer, I want to scan tickets at the door so that only paid attend
 - **A5** Event times are stored in America/New_York, and the 24-hour cutoff uses that time.
 - **A6** Organizers scan with a phone browser. No offline scanning.
 - **A7** Chargebacks are handled by the club in its own Stripe dashboard, not in our app.
+
+## Scope for HW3
+
+- Build story US-3: Check in attendees.
+- No real payments. Where the spec says to charge a card, use a
+  "Simulated payment" button and list real payments as a non-goal in
+  the README.
+- No sign-in provider. Where the spec needs a signed-in user, use a
+  name typed into a text box and list real authentication as a
+  non-goal. For US-3, an "approved organizer" is a CMU email on a
+  fixed demo roster in the server code (one club per organizer),
+  standing in for admin approval.
+- No database. Keep data in memory on the server and say in the README
+  that it resets on every deploy.
+- "Scanning" a ticket means typing or pasting its ticket code; a phone
+  camera scanner is out of scope for HW3.

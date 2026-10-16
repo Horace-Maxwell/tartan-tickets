@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { clearBuyerCookies, getCurrentBuyer, saveBuyerState, setBuyerCookie } from "@/lib/currentBuyer";
 import { getService } from "@/lib/store";
-import { type MessageKey, validateBuyer } from "@/lib/ticketing";
+import { type MessageKey, type ScanResult, validateBuyer } from "@/lib/ticketing";
 
 function withError(path: string, code: MessageKey) {
   return `${path}?error=${code}`;
@@ -62,4 +62,12 @@ export async function cancelMyTicket(formData: FormData) {
   if (!r.ok) redirect(withError("/tickets", r.code));
   await saveBuyerState(buyer);
   redirect(`/tickets?cancelled=${encodeURIComponent(ticketId)}`);
+}
+
+/** US-3: an organizer checks in one ticket code for one of their own club's events. */
+export async function scanTicketAction(_prev: ScanResult | null, formData: FormData): Promise<ScanResult> {
+  const eventId = String(formData.get("eventId") ?? "");
+  const buyer = await getCurrentBuyer();
+  if (!buyer) return { ok: false, code: "signInFirst", error: "Please sign in with your name and CMU email first." };
+  return getService().scanTicket(buyer.email, eventId, formData.get("token"));
 }

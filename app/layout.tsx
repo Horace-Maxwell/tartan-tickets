@@ -25,6 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <nav>
             <Link href="/">Events</Link>
             <Link href="/tickets">My tickets</Link>
+            <Link href="/checkin">Check-in</Link>
             {buyer && (
               <form action={signOut} className="inline">
                 <span className="who" title={buyer.email}>
