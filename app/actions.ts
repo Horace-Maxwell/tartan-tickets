@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearBuyerCookies, getCurrentBuyer, saveBuyerState, setBuyerCookie, stateKey } from "@/lib/currentBuyer";
 import { decodeTicketPass } from "@/lib/ticketPass";
@@ -75,5 +76,7 @@ export async function scanTicketAction(_prev: ScanResult | null, formData: FormD
   // A signed pass lets this server copy learn about a ticket that was bought on another copy.
   const pass = decodeTicketPass(raw, stateKey());
   if (pass && svc.organizerFor(buyer.email)) svc.restore(pass.snapshot);
-  return svc.scanTicket(buyer.email, eventId, pass ? pass.token : raw);
+  const result = svc.scanTicket(buyer.email, eventId, pass ? pass.token : raw);
+  revalidatePath("/checkin"); // refresh the attendee list under the form
+  return result;
 }
